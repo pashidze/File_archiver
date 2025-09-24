@@ -4,5 +4,8 @@
 #pragma once
 
 #include <iostream>
+#include <filesystem>
+#include <string>
+#include <deque>
 
 // TODO: Reference additional headers your program requires here.
