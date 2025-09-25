@@ -5,7 +5,9 @@
 
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include <string>
-#include <deque>
+#include <vector>
+#include <Windows.h>
 
 // TODO: Reference additional headers your program requires here.

@@ -4,43 +4,104 @@
 #include "File_archiver.h"
 
 using namespace std;
+namespace fs = filesystem;
 
-void get_files(deque<filesystem::path>& patchs, const filesystem::path& current_patch)
+class QueueFiles
 {
-	for (const auto& file : filesystem::directory_iterator(current_patch))
+private:
+	vector<fs::path> files;
+	fs::path current_patch = {};
+public:
+
+	void set_path(const string& string_patch)
 	{
-		if (filesystem::is_directory(file))
+		this->current_patch = fs::u8path(string_patch);
+	}
+
+	fs::path& get_patch()
+	{
+		return this->current_patch;
+	}
+
+	const vector<fs::path>& get_files()
+	{
+		return this->files;
+	}
+
+	size_t get_size()
+	{
+		return this->files.size();
+	}
+
+	void collect_files()
+	{
+		error_code ec;
+		this->files.clear();
+
+		if (this->current_patch.empty() || !fs::exists(this->current_patch, ec))
 		{
-			get_files(patchs, file.path().string());
+			if (!ec) ec = make_error_code(errc::no_such_file_or_directory);
 		}
-		else if (filesystem::is_regular_file(file))
+
+		try
 		{
-			patchs.push_back(file.path());
+			for (const auto& file : fs::recursive_directory_iterator(this->current_patch))
+			{
+				fs::file_status fStatus = fs::symlink_status(file.path());
+				if (fs::is_regular_file(fStatus))
+				{
+					this->files.push_back(file.path());
+				}
+			}
+		}
+		catch (const fs::filesystem_error& er)
+		{
+			ec = er.code();
+			cerr << "Ошибка при обходе: " << ec.message() << "\n";
+		}
+	}
+
+	void write_list_to_text_file(const fs::path& output_file)
+	{
+		error_code ec;
+		ofstream ofs(output_file);
+		if (ofs)
+		{
+			for (const auto& it : this->files)
+			{
+				ofs << it << "\n";
+			}
 		}
 		else
 		{
-			return;
+			ec = make_error_code(errc::io_error);
+			cerr << "Не удалось записать файл: " << ec.message() << "\n";
 		}
+		ofs.close();
 	}
-}
+};
 
 int main()
 {
 	setlocale(LC_ALL, "rus");
+
+	SetConsoleCP(CP_UTF8);
+	SetConsoleOutputCP(CP_UTF8);
 	
-	deque<filesystem::path> patchs;
-	string catPatch;
+	string string_patch;
+	QueueFiles qf;
 	
 	cout << "Укажите путь к каталогу: ";
-	getline(cin, catPatch);
+	getline(cin, string_patch);
 
-	get_files(patchs, catPatch);
+	qf.set_path(string_patch);
 
-	cout << "Найдено " << patchs.size() << " файлов:\n";
-	for (auto it = patchs.cbegin(); it != patchs.cend(); ++it)
-	{
-		cout << *it << "\n";
-	}
-	
+	qf.collect_files();
+	cout << "Найдено " << qf.get_size() << " файлов.\n\n";
+
+	qf.write_list_to_text_file("Files_list.txt");
+	cout << "Список файлов записан в Files_list.txt\n\n";
+
+	system("pause");
 	return 0;
 }
